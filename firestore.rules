@@ -1,0 +1,150 @@
+/channelLogos/MHmhYtqf7zMyaTBAHgA49UJqDCc2/UCC93Yp3o7qpvLDkJHhN6b8g_1747945001307.com
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ავთენტიფიცირებული მომხმარებლის ფუნქცია 
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // ადმინის ფუნქცია
+    function isAdmin() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // ფუნქცია შესამოწმებლად, არის თუ არა მომხმარებელი დოკუმენტის მფლობელი
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // ფუნქცია შესამოწმებლად, არის თუ არა მომხმარებელი ჩატის გამყიდველი
+    function isChatSeller(chatData) {
+      return isAuthenticated() && request.auth.uid == chatData.sellerId;
+    }
+    
+    // ფუნქცია შესამოწმებლად, არის თუ არა მომხმარებელი ჩატის მყიდველი
+    function isChatBuyer(chatData) {
+      return isAuthenticated() && 
+             chatData.participants.hasAny([request.auth.uid]) && 
+             request.auth.uid != chatData.sellerId;
+    }
+    
+    // ფუნქცია შესამოწმებლად, არის თუ არა მომხმარებელი პროდუქტის მფლობელი
+    function isProductOwner(productData) {
+      return isAuthenticated() && 
+             request.auth.uid == productData.userId &&
+             request.auth.token.email == productData.userEmail;
+    }
+    
+    // ფუნქცია შესამოწმებლად, არის თუ არა მომხმარებელი ნამდვილი გამყიდველი (პროდუქტის მფლობელი და ჩატის გამყიდველი)
+    function isRealSeller(chatData, productData) {
+      return isAuthenticated() && (
+        // მომხმარებელი არის პროდუქტის მფლობელი
+        (request.auth.uid == productData.userId && request.auth.token.email == productData.userEmail) ||
+        // მომხმარებელი არის ჩატში დაფიქსირებული გამყიდველი და პროდუქტის მფლობელი
+        (request.auth.uid == chatData.sellerId && request.auth.uid == productData.userId)
+      );
+    }
+    
+    // მომხმარებლების წესები
+    match /users/{userId} {
+      // ნებისმიერ ვიზიტორს შეუძლია წაიკითხოს მომხმარებლის საჯარო მონაცემები
+      allow read: if true;
+      
+      // მომხმარებელს შეუძლია შექმნას საკუთარი მომხმარებლის დოკუმენტი
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // მომხმარებელს შეუძლია განაახლოს მხოლოდ საკუთარი მომხმარებლის დოკუმენტი
+      // ან ადმინს შეუძლია განაახლოს ნებისმიერი მომხმარებლის დოკუმენტი
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      
+      // მხოლოდ ადმინს შეუძლია წაშალოს მომხმარებლის დოკუმენტი
+      allow delete: if isAdmin();
+      
+      // Chat list subcollection rules
+      match /chatList/{chatId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+    
+    // პროდუქტების წესები
+    match /products/{productId} {
+      // ნებისმიერ მომხმარებელს შეუძლია წაიკითხოს პროდუქტები (ავთენტიფიკაციის გარეშეც)
+      allow read: if true;
+      
+      // მომხმარებელს შეუძლია შექმნას პროდუქტი
+      allow create: if isAuthenticated();
+      
+      // მხოლოდ პროდუქტის მფლობელს ან ადმინს შეუძლია განაახლოს პროდუქტი
+      allow update: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // მხოლოდ პროდუქტის მფლობელს ან ადმინს შეუძლია წაშალოს პროდუქტი
+      allow delete: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // ჩატების წესები
+    match /chats/{chatId} {
+      // ნებისმიერ მომხმარებელს შეუძლია წაიკითხოს ჩატი (ავთენტიფიკაციის გარეშეც)
+      allow read: if isAuthenticated() && 
+        (resource.data.participants.hasAny([request.auth.uid]) || isAdmin());
+      
+      // ნებისმიერ ავთენტიფიცირებულ მომხმარებელს შეუძლია შექმნას ჩატი
+      allow create: if isAuthenticated();
+      
+      // ჩატის განახლება - მკაცრი წესები პრიმარი მფლობელობის ცვლილებებისთვის
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        isChatBuyer(resource.data) ||
+        isChatSeller(resource.data)
+      );
+      
+      // წაშლა არ არის ნებადართული, ჩატი შეიძლება მხოლოდ დაიხუროს
+      allow delete: if isAdmin();
+    }
+    
+    // შეფასებების წესები
+    match /reviews/{reviewId} {
+      // ნებისმიერ მომხმარებელს შეუძლია წაიკითხოს შეფასებები (ავთენტიფიკაციის გარეშეც)
+      allow read: if true;
+      
+      // მომხმარებელს შეუძლია დაამატოს შეფასება, თუ ის არის ჩატის მონაწილე
+      allow create: if isAuthenticated() && (
+        get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data.participants.hasAny([request.auth.uid])
+      );
+      
+      // შეფასების განახლება ან წაშლა არ არის ნებადართული
+      allow update, delete: if false;
+    }
+    
+    // პროდუქტებთან დაკავშირებული კოლექციების წესები
+    match /productViews/{viewId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    
+    match /featured_products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /product_categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // ადმინისტრატორის შეტყობინებების წესები
+    match /admin_notifications/{notificationId} {
+      // მხოლოდ ადმინს აქვს წვდომა ადმინისტრატორის შეტყობინებებზე
+      allow read, write: if isAdmin();
+    }
+    
+    // ნებისმიერი სხვა კოლექცია - მხოლოდ ადმინისტრატორებისთვის
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

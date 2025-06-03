@@ -1,0 +1,64 @@
+export interface Product {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  price: number;
+  imageUrl?: string;
+  imageUrls?: string[];
+  status: 'active' | 'inactive';
+  category: string;
+  platform: string;
+  channelId?: string;
+  channelName?: string;
+  channelLogo?: string;
+  subscribers?: number;
+  income?: number;
+  monthlyIncome?: number;
+  monthlyExpenses?: number;
+  incomeSource?: string;
+  expenseDetails?: string;
+  monetization?: boolean;
+  verified?: boolean;
+  createdAt: number;
+  updatedAt: number;
+  lastUpdated?: number;
+  accountLink?: string;
+  allowComments?: boolean;
+  views?: number;
+  likes?: number;
+  comments?: any[];
+  tags?: string[];
+  location?: string;
+  language?: string;
+  engagementRate?: number;
+  analytics?: Record<string, any>;
+  metrics?: Record<string, any>;
+  settings?: Record<string, any>;
+  promotionStrategy?: string;
+  supportRequirements?: string;
+  verificationCode?: string;
+  userId?: string;
+  userEmail?: string;
+}
+
+export interface ProductFormData {
+  platform: string;
+  category: string;
+  accountLink: string;
+  displayName: string;
+  price: number;
+  subscribers: number;
+  allowComments: boolean;
+  description: string;
+  monthlyIncome: number;
+  monthlyExpenses: number;
+  incomeSource: string;
+  expenseDetails: string;
+  promotionStrategy: string;
+  supportRequirements: string;
+  images: File[];
+  verificationCode: string;
+  channelLogo?: string;
+  channelId?: string;
+} 
